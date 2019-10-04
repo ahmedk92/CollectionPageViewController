@@ -37,6 +37,19 @@ class ViewController: UIViewController, CollectionPageViewControllerDataSource {
         sender.setTitle("\(collectionPageViewController.navigationOrientation)", for: .normal)
     }
     
+    private var textFieldEditingChangedTimer: Timer?
+    @IBAction private func indexTextFieldEditingChanged(_ sender: UITextField) {
+        textFieldEditingChangedTimer?.invalidate()
+        textFieldEditingChangedTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false, block: { [weak self] (_) in
+            guard let self = self, let index = Int(sender.text ?? "") else { return }
+            defer {
+                sender.resignFirstResponder()
+            }
+            
+            self.collectionPageViewController.index = index
+        })
+    }
+    
     // MARK: - Overrides
 
     override func viewDidLoad() {
@@ -53,7 +66,7 @@ class ViewController: UIViewController, CollectionPageViewControllerDataSource {
     
     // MARK: - CollectionPageViewControllerDataSource
     func numberOfViewControllers(in collectionPageViewController: CollectionPageViewController) -> Int {
-        return 8
+        return 128
     }
     
     func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, viewControllerAt index: Int) -> UIViewController {

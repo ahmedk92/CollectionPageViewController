@@ -68,6 +68,25 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
             return NavigationOrientation(collectionViewScrollDirection: collectionView.flowLayout?.scrollDirection ?? .horizontal)
         }
     }
+    open var index: Int {
+        get {
+            switch navigationOrientation {
+            case .horizontal: return Int((collectionView.contentOffset.x + collectionView.bounds.width / 2) / collectionView.bounds.width)
+            case .vertical: return Int((collectionView.contentOffset.y + collectionView.bounds.height / 2) / collectionView.bounds.height)
+            }
+        }
+        
+        set {
+            guard newValue != index, let snapshotImage = collectionView.makeSnapshotImage() else { return }
+            
+            if let nearestIndex = scrollIfNeededWithoutAnimation(to: newValue) {
+                collectionView.impose(image: snapshotImage, onCellAt: nearestIndex)
+            }
+            scrollAnimated(to: newValue) {
+                self.collectionView.removeSnapshot()
+            }
+        }
+    }
     open weak var dataSource: CollectionPageViewControllerDataSource?
     
     private let collectionViewCellReuseIdentifier = "cell"
@@ -97,6 +116,28 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
             viewController.willMove(toParent: nil)
             viewController.view.removeFromSuperview()
             viewController.removeFromParent()
+        }
+    }
+    
+    private var count: Int {
+        switch navigationOrientation {
+            case .horizontal: return Int(collectionView.contentSize.width / collectionView.bounds.width)
+            case .vertical: return Int(collectionView.contentSize.height / collectionView.bounds.height)
+        }
+    }
+    
+    @discardableResult
+    private func scrollIfNeededWithoutAnimation(to index: Int) -> Int? {
+        guard abs(index - self.index) > 1 else { return nil }
+        let index = index > self.index ? index - 1 : index + 1
+        collectionView.scrollToItem(at: IndexPath(row: index, section: 0), at: navigationOrientation == .horizontal ? .centeredHorizontally : .centeredVertically, animated: false)
+        return index
+    }
+    
+    private func scrollAnimated(to index: Int, completionHandler: (() -> Void)? = nil) {
+        collectionView.scrollToItem(at: IndexPath(row: index, section: 0), at: navigationOrientation == .horizontal ? .centeredHorizontally : .centeredVertically, animated: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            completionHandler?()
         }
     }
     
@@ -178,11 +219,29 @@ internal class CollectionView: UICollectionView {
         }
     }
     
+    func impose(image: UIImage, onCellAt index: Int) {
+        let snapshotView = UIImageView(image: image)
+        defer {
+            self.snapshotView = snapshotView
+        }
+        
+        switch flowLayout!.scrollDirection {
+        case .horizontal:
+            snapshotView.frame = CGRect(x: CGFloat(index) * bounds.width, y: 0, width: bounds.width, height: bounds.height)
+        case .vertical:
+            snapshotView.frame = CGRect(x: 0, y: CGFloat(index) * bounds.height, width: bounds.width, height: bounds.height)
+        @unknown default:
+            fatalError()
+        }
+        
+        addSubview(snapshotView)
+    }
+    
     func removeSnapshot() {
         snapshotView?.removeFromSuperview()
     }
     
-    private func makeSnapshotImage() -> UIImage? {
+    func makeSnapshotImage() -> UIImage? {
         UIGraphicsBeginImageContextWithOptions(bounds.size, false, UIScreen.main.scale)
         defer {
             UIGraphicsEndImageContext()
