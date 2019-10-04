@@ -1,0 +1,11 @@
+use_frameworks!
+
+target 'CollectionPageViewController_Example' do
+  pod 'CollectionPageViewController', :path => '../'
+
+  target 'CollectionPageViewController_Tests' do
+    inherit! :search_paths
+
+    
+  end
+end
