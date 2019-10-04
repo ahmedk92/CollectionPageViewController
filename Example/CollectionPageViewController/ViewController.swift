@@ -11,21 +11,30 @@ import CollectionPageViewController
 
 class ViewController: UIViewController, CollectionPageViewControllerDataSource {
     
+    @IBOutlet private weak var navigationOrientationButton: UIButton!
+    @IBOutlet private weak var collectionPageViewControllerContainerView: UIView!
+    
     private lazy var collectionPageViewController: CollectionPageViewController = {
-        let cpvc = CollectionPageViewController(navigationOrientation: .horizontal)
+        let cpvc = CollectionPageViewController()
+        cpvc.navigationOrientation = .horizontal
         cpvc.dataSource = self
         return cpvc
     }()
     
     private func addCollectionPageViewController() {
         collectionPageViewController.view.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(collectionPageViewController.view)
+        collectionPageViewControllerContainerView.addSubview(collectionPageViewController.view)
         NSLayoutConstraint.activate([
-            view.leadingAnchor.constraint(equalTo: collectionPageViewController.view.leadingAnchor),
-            view.trailingAnchor.constraint(equalTo: collectionPageViewController.view.trailingAnchor),
-            view.topAnchor.constraint(equalTo: collectionPageViewController.view.topAnchor),
-            view.bottomAnchor.constraint(equalTo: collectionPageViewController.view.bottomAnchor),
+            collectionPageViewControllerContainerView.leadingAnchor.constraint(equalTo: collectionPageViewController.view.leadingAnchor),
+            collectionPageViewControllerContainerView.trailingAnchor.constraint(equalTo: collectionPageViewController.view.trailingAnchor),
+            collectionPageViewControllerContainerView.topAnchor.constraint(equalTo: collectionPageViewController.view.topAnchor),
+            collectionPageViewControllerContainerView.bottomAnchor.constraint(equalTo: collectionPageViewController.view.bottomAnchor),
         ])
+    }
+    
+    @IBAction private func navigtionOrientationButtonTapped(_ sender: UIButton) {
+        collectionPageViewController.navigationOrientation = collectionPageViewController.navigationOrientation == .horizontal ? .vertical : .horizontal
+        sender.setTitle("\(collectionPageViewController.navigationOrientation)", for: .normal)
     }
     
     // MARK: - Overrides
@@ -34,6 +43,7 @@ class ViewController: UIViewController, CollectionPageViewControllerDataSource {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
         addCollectionPageViewController()
+        navigationOrientationButton.setTitle("\(collectionPageViewController.navigationOrientation)", for: .normal)
     }
 
     override func didReceiveMemoryWarning() {

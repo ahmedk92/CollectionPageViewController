@@ -13,8 +13,7 @@ public protocol CollectionPageViewControllerDataSource: AnyObject {
 }
 
 open class CollectionPageViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
-    public init(navigationOrientation: NavigationOrientation) {
-        self.navigationOrientation = navigationOrientation
+    public init() {
         super.init(nibName: nil, bundle: nil)
     }
     required public init?(coder aDecoder: NSCoder) {
@@ -30,16 +29,51 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
                 case .vertical:   return .vertical
             }
         }
+        
+        internal init(collectionViewScrollDirection: UICollectionView.ScrollDirection) {
+            switch collectionViewScrollDirection {
+                case .horizontal: self = .horizontal
+                case .vertical: self = .vertical
+            @unknown default:
+                self = .horizontal
+            }
+        }
     }
     
-    open var navigationOrientation: NavigationOrientation
+    open var navigationOrientation: NavigationOrientation {
+        set {
+            let scrollRate: CGFloat
+            switch navigationOrientation {
+            case .horizontal:
+                scrollRate = collectionView.contentOffset.x / collectionView.contentSize.width
+            case .vertical:
+                scrollRate = collectionView.contentOffset.y / collectionView.contentSize.height
+            }
+            collectionView.addSnapshot()
+            collectionView.flowLayout?.scrollDirection = newValue.collectionViewScrollDirection
+            collectionView.flowLayout?.invalidateLayout()
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + TimeInterval(scrollRate)) {
+                switch newValue {
+                case .horizontal:
+                    self.collectionView.contentOffset.x = self.collectionView.contentSize.width * scrollRate
+                case .vertical:
+                    self.collectionView.contentOffset.y = self.collectionView.contentSize.height * scrollRate
+                }
+                self.collectionView.removeSnapshot()
+            }
+        }
+        
+        get {
+            return NavigationOrientation(collectionViewScrollDirection: collectionView.flowLayout?.scrollDirection ?? .horizontal)
+        }
+    }
     open weak var dataSource: CollectionPageViewControllerDataSource?
     
     private let collectionViewCellReuseIdentifier = "cell"
-    private lazy var collectionView: UICollectionView = {
+    private lazy var collectionView: CollectionView = {
         let cvLayout = UICollectionViewFlowLayout()
-        cvLayout.scrollDirection = navigationOrientation.collectionViewScrollDirection
-        let cv = UICollectionView(frame: .zero, collectionViewLayout: cvLayout)
+        let cv = CollectionView(frame: .zero, collectionViewLayout: cvLayout)
         cv.isPagingEnabled = true
         cv.dataSource = self
         cv.delegate = self
@@ -122,5 +156,39 @@ internal class CollectionViewCell: UICollectionViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         willPrepareForReuse?()
+    }
+}
+
+fileprivate extension UICollectionView {
+    var flowLayout: UICollectionViewFlowLayout? {
+        return collectionViewLayout as? UICollectionViewFlowLayout
+    }
+}
+
+internal class CollectionView: UICollectionView {
+    private weak var snapshotView: UIView?
+    func addSnapshot() {
+        if let snapshotViewImage = makeSnapshotImage() {
+            let snapshotView = UIImageView(image: snapshotViewImage)
+            defer {
+                self.snapshotView = snapshotView
+            }
+            snapshotView.frame = frame
+            superview?.addSubview(snapshotView)
+        }
+    }
+    
+    func removeSnapshot() {
+        snapshotView?.removeFromSuperview()
+    }
+    
+    private func makeSnapshotImage() -> UIImage? {
+        UIGraphicsBeginImageContextWithOptions(bounds.size, false, UIScreen.main.scale)
+        defer {
+            UIGraphicsEndImageContext()
+        }
+        
+        superview?.drawHierarchy(in: frame, afterScreenUpdates: false)
+        return UIGraphicsGetImageFromCurrentImageContext()
     }
 }
