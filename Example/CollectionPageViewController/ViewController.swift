@@ -22,6 +22,10 @@ class ViewController: UIViewController, CollectionPageViewControllerDataSource {
     }()
     
     private func addCollectionPageViewController() {
+        addChild(collectionPageViewController)
+        defer {
+            collectionPageViewController.didMove(toParent: self)
+        }
         collectionPageViewController.view.translatesAutoresizingMaskIntoConstraints = false
         collectionPageViewControllerContainerView.addSubview(collectionPageViewController.view)
         NSLayoutConstraint.activate([

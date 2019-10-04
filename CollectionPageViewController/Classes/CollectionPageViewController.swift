@@ -77,13 +77,14 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
         }
         
         set {
-            guard newValue != index, let snapshotImage = collectionView.makeSnapshotImage() else { return }
+            guard (0..<count).contains(newValue
+            ), newValue != index, let snapshotImage = collectionView.makeSnapshotImage() else { return }
             
             if let nearestIndex = scrollIfNeededWithoutAnimation(to: newValue) {
                 collectionView.impose(image: snapshotImage, onCellAt: nearestIndex)
             }
             scrollAnimated(to: newValue) {
-                self.collectionView.removeSnapshot()
+                self.collectionView.removeImposedSnapshot()
             }
         }
     }
@@ -141,11 +142,39 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
         }
     }
     
+    private func setCollectionViewContentOffsetWithoutAnimation(for index: Int) {
+        switch navigationOrientation {
+            case .horizontal:
+                collectionView.contentOffset.x = CGFloat(index) * collectionView.bounds.width
+            case .vertical:
+                collectionView.contentOffset.y = CGFloat(index) * collectionView.bounds.height
+        }
+    }
+    
     // MARK: - Overrides
     open override func viewDidLoad() {
         super.viewDidLoad()
         
         addCollectionView()
+    }
+    
+    open override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        
+        let index = self.index
+        collectionView.addSnapshot()
+        coordinator.animate(alongsideTransition: { (_) in
+            self.collectionView.flowLayout?.invalidateLayout()
+            self.setCollectionViewContentOffsetWithoutAnimation(for: index)
+            NotificationCenter.default.post(name: hideCellNotification, object: nil, userInfo: [showHideCellNotificationIndexParameterName: index])
+            UIView.performWithoutAnimation {
+                self.view.layoutIfNeeded()
+            }
+        }) { (_) in
+            self.collectionView.removeSnapshot()
+            NotificationCenter.default.post(name: showCellNotification, object: nil, userInfo: [showHideCellNotificationIndexParameterName: index])
+        }
+        
+        super.viewWillTransition(to: size, with: coordinator)
     }
     
     // MARK: - UICollectionViewDataSource
@@ -157,6 +186,7 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
     }
     public func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: collectionViewCellReuseIdentifier, for: indexPath) as! CollectionViewCell
+        cell.index = indexPath.row
         cell.willPrepareForReuse = { [weak self] in
             guard let self = self else { return }
             self.removeViewController(from: cell)
@@ -194,9 +224,22 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
 
 internal class CollectionViewCell: UICollectionViewCell {
     var willPrepareForReuse: (() -> Void)?
+    var index: Int = -1
     override func prepareForReuse() {
         super.prepareForReuse()
         willPrepareForReuse?()
+    }
+    
+    override func didMoveToSuperview() {
+        super.didMoveToSuperview()
+        NotificationCenter.default.addObserver(forName: hideCellNotification, object: nil, queue: nil) { [weak self] (notification) in
+            guard let self = self, let index = notification.userInfo?[showHideCellNotificationIndexParameterName] as? Int, index != self.index else { return }
+            self.isHidden = true
+        }
+        NotificationCenter.default.addObserver(forName: showCellNotification, object: nil, queue: nil) { [weak self] (notification) in
+            guard let self = self, let index = notification.userInfo?[showHideCellNotificationIndexParameterName] as? Int else { return }
+            self.isHidden = false
+        }
     }
 }
 
@@ -208,9 +251,11 @@ fileprivate extension UICollectionView {
 
 internal class CollectionView: UICollectionView {
     private weak var snapshotView: UIView?
+    private weak var imposedSnapshotView: UIView?
     func addSnapshot() {
         if let snapshotViewImage = makeSnapshotImage() {
             let snapshotView = UIImageView(image: snapshotViewImage)
+            snapshotView.contentMode = .scaleAspectFill
             defer {
                 self.snapshotView = snapshotView
             }
@@ -222,7 +267,7 @@ internal class CollectionView: UICollectionView {
     func impose(image: UIImage, onCellAt index: Int) {
         let snapshotView = UIImageView(image: image)
         defer {
-            self.snapshotView = snapshotView
+            self.imposedSnapshotView = snapshotView
         }
         
         switch flowLayout!.scrollDirection {
@@ -241,6 +286,10 @@ internal class CollectionView: UICollectionView {
         snapshotView?.removeFromSuperview()
     }
     
+    func removeImposedSnapshot() {
+        imposedSnapshotView?.removeFromSuperview()
+    }
+    
     func makeSnapshotImage() -> UIImage? {
         UIGraphicsBeginImageContextWithOptions(bounds.size, false, UIScreen.main.scale)
         defer {
@@ -250,4 +299,15 @@ internal class CollectionView: UICollectionView {
         superview?.drawHierarchy(in: frame, afterScreenUpdates: false)
         return UIGraphicsGetImageFromCurrentImageContext()
     }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if let snapshotView = snapshotView {
+            snapshotView.frame = CGRect(origin: frame.origin, size: CGSize(width: frame.width, height: (snapshotView.frame.height / snapshotView.frame.width) * frame.width))
+        }
+    }
 }
+
+fileprivate let hideCellNotification = NSNotification.Name(rawValue: "hideCellNotification")
+fileprivate let showCellNotification = NSNotification.Name(rawValue: "showCellNotification")
+fileprivate let showHideCellNotificationIndexParameterName = "index"
