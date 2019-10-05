@@ -88,6 +88,10 @@ class ViewController: UIViewController, CollectionPageViewControllerDataSource, 
     func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, didNavigateTo index: Int) {
         print("didNavigateTo index: \(index)")
     }
+    
+    func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, isNowAt index: Int) {
+        print("isNowAt index: \(index)")
+    }
 
 }
 

@@ -15,6 +15,7 @@ public protocol CollectionPageViewControllerDataSource: AnyObject {
 public protocol CollectionPageViewControllerDelegate: AnyObject {
     func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, willNavigateTo index: Int)
     func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, didNavigateTo index: Int)
+    func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, isNowAt index: Int)
 }
 
 open class CollectionPageViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
@@ -82,10 +83,10 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
         }
         
         set {
-            guard (0..<count).contains(newValue
-            ), newValue != index, let snapshotImage = collectionView.makeSnapshotImage() else { return }
+            guard (0..<count).contains(newValue), newValue != index, let snapshotImage = collectionView.makeSnapshotImage() else { return }
             
             delegate?.collectionPageViewController(self, willNavigateTo: newValue)
+            transitionInfo = .inProgress(targetIndex: newValue)
             
             if let nearestIndex = scrollIfNeededWithoutAnimation(to: newValue) {
                 collectionView.impose(image: snapshotImage, onCellAt: nearestIndex)
@@ -163,10 +164,23 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
     private var indexTracker: Int = 0 {
         didSet {
             if indexTracker != oldValue {
-                delegate?.collectionPageViewController(self, didNavigateTo: indexTracker)
+                switch transitionInfo {
+                    case .inProgress(let targetIndex):
+                        if targetIndex == index {
+                            delegate?.collectionPageViewController(self, didNavigateTo: index)
+                        }
+                default:
+                    break
+                }
+                delegate?.collectionPageViewController(self, isNowAt: index)
             }
         }
     }
+    enum TransitionInfo {
+        case inProgress(targetIndex: Int)
+        case noTransition
+    }
+    private var transitionInfo = TransitionInfo.noTransition
     
     // MARK: - Overrides
     open override func viewDidLoad() {
