@@ -12,6 +12,11 @@ public protocol CollectionPageViewControllerDataSource: AnyObject {
     func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, viewControllerAt index: Int) -> UIViewController
 }
 
+public protocol CollectionPageViewControllerDelegate: AnyObject {
+    func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, willNavigateTo index: Int)
+    func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, didNavigateTo index: Int)
+}
+
 open class CollectionPageViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     public init() {
         super.init(nibName: nil, bundle: nil)
@@ -80,6 +85,8 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
             guard (0..<count).contains(newValue
             ), newValue != index, let snapshotImage = collectionView.makeSnapshotImage() else { return }
             
+            delegate?.collectionPageViewController(self, willNavigateTo: newValue)
+            
             if let nearestIndex = scrollIfNeededWithoutAnimation(to: newValue) {
                 collectionView.impose(image: snapshotImage, onCellAt: nearestIndex)
             }
@@ -88,7 +95,9 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
             }
         }
     }
+    
     open weak var dataSource: CollectionPageViewControllerDataSource?
+    open weak var delegate: CollectionPageViewControllerDelegate?
     
     private let collectionViewCellReuseIdentifier = "cell"
     private lazy var collectionView: CollectionView = {
@@ -148,6 +157,14 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
                 collectionView.contentOffset.x = CGFloat(index) * collectionView.bounds.width
             case .vertical:
                 collectionView.contentOffset.y = CGFloat(index) * collectionView.bounds.height
+        }
+    }
+    
+    private var indexTracker: Int = 0 {
+        didSet {
+            if indexTracker != oldValue {
+                delegate?.collectionPageViewController(self, didNavigateTo: indexTracker)
+            }
         }
     }
     
@@ -220,6 +237,10 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
     public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         return collectionView.bounds.size
     }
+    
+    public func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        indexTracker = index
+    }
 }
 
 internal class CollectionViewCell: UICollectionViewCell {
@@ -237,7 +258,7 @@ internal class CollectionViewCell: UICollectionViewCell {
             self.isHidden = true
         }
         NotificationCenter.default.addObserver(forName: showCellNotification, object: nil, queue: nil) { [weak self] (notification) in
-            guard let self = self, let index = notification.userInfo?[showHideCellNotificationIndexParameterName] as? Int else { return }
+            guard let self = self else { return }
             self.isHidden = false
         }
     }

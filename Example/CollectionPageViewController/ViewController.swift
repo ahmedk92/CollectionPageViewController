@@ -9,7 +9,7 @@
 import UIKit
 import CollectionPageViewController
 
-class ViewController: UIViewController, CollectionPageViewControllerDataSource {
+class ViewController: UIViewController, CollectionPageViewControllerDataSource, CollectionPageViewControllerDelegate {
     
     @IBOutlet private weak var navigationOrientationButton: UIButton!
     @IBOutlet private weak var collectionPageViewControllerContainerView: UIView!
@@ -18,6 +18,7 @@ class ViewController: UIViewController, CollectionPageViewControllerDataSource {
         let cpvc = CollectionPageViewController()
         cpvc.navigationOrientation = .horizontal
         cpvc.dataSource = self
+        cpvc.delegate = self
         return cpvc
     }()
     
@@ -70,13 +71,22 @@ class ViewController: UIViewController, CollectionPageViewControllerDataSource {
     
     // MARK: - CollectionPageViewControllerDataSource
     func numberOfViewControllers(in collectionPageViewController: CollectionPageViewController) -> Int {
-        return 128
+        return 1024
     }
     
     func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, viewControllerAt index: Int) -> UIViewController {
         let vc = storyboard?.instantiateViewController(withIdentifier: "ContentViewController") as! ContentViewController
         vc.index = index
         return vc
+    }
+    
+    // MARK: - CollectionPageViewControllerDelegate
+    func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, willNavigateTo index: Int) {
+        print("willNavigateTo index: \(index)")
+    }
+    
+    func collectionPageViewController(_ collectionPageViewController: CollectionPageViewController, didNavigateTo index: Int) {
+        print("didNavigateTo index: \(index)")
     }
 
 }
