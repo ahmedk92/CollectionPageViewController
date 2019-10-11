@@ -102,7 +102,7 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
     
     private let collectionViewCellReuseIdentifier = "cell"
     private lazy var collectionView: CollectionView = {
-        let cvLayout = UICollectionViewFlowLayout()
+        let cvLayout = CollectionViewFlowLayout()
         let cv = CollectionView(frame: .zero, collectionViewLayout: cvLayout)
         cv.isPagingEnabled = true
         cv.dataSource = self
@@ -195,6 +195,10 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
         
         indexBeforeRotation = index
         
+        coordinator.animate(alongsideTransition: { (_) in
+            self.collectionView.collectionViewLayout.invalidateLayout()
+        })
+        
         super.viewWillTransition(to: size, with: coordinator)
     }
     
@@ -238,16 +242,19 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
     public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
         return 0
     }
+    public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
+        return .zero
+    }
     public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         return collectionView.bounds.size
     }
     
     public func collectionView(_ collectionView: UICollectionView, targetContentOffsetForProposedContentOffset proposedContentOffset: CGPoint) -> CGPoint {
         switch navigationOrientation {
-            case .horizontal:
-                return CGPoint(x: CGFloat(indexBeforeRotation) * collectionView.bounds.width, y: proposedContentOffset.y)
-            case .vertical:
-                return CGPoint(x: proposedContentOffset.x, y: CGFloat(indexBeforeRotation) * collectionView.bounds.height)
+        case .horizontal:
+            return CGPoint(x: CGFloat(indexBeforeRotation) * collectionView.bounds.width, y: proposedContentOffset.y)
+        case .vertical:
+            return CGPoint(x: proposedContentOffset.x, y: CGFloat(indexBeforeRotation) * collectionView.bounds.height)
         }
     }
     
@@ -262,18 +269,6 @@ internal class CollectionViewCell: UICollectionViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         willPrepareForReuse?()
-    }
-    
-    override func didMoveToSuperview() {
-        super.didMoveToSuperview()
-        NotificationCenter.default.addObserver(forName: hideCellNotification, object: nil, queue: nil) { [weak self] (notification) in
-            guard let self = self, let index = notification.userInfo?[showHideCellNotificationIndexParameterName] as? Int, index != self.index else { return }
-            self.isHidden = true
-        }
-        NotificationCenter.default.addObserver(forName: showCellNotification, object: nil, queue: nil) { [weak self] (notification) in
-            guard let self = self else { return }
-            self.isHidden = false
-        }
     }
 }
 
@@ -342,6 +337,12 @@ internal class CollectionView: UICollectionView {
     }
 }
 
-fileprivate let hideCellNotification = NSNotification.Name(rawValue: "hideCellNotification")
-fileprivate let showCellNotification = NSNotification.Name(rawValue: "showCellNotification")
-fileprivate let showHideCellNotificationIndexParameterName = "index"
+class CollectionViewFlowLayout: UICollectionViewFlowLayout {
+    override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
+        return true
+    }
+    
+    override func shouldInvalidateLayout(forPreferredLayoutAttributes preferredAttributes: UICollectionViewLayoutAttributes, withOriginalAttributes originalAttributes: UICollectionViewLayoutAttributes) -> Bool {
+        return true
+    }
+}
