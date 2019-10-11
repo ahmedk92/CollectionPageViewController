@@ -161,9 +161,9 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
         }
     }
     
-    private var indexTracker: Int = 0 {
+    private var indexChangeNotifier: Int = 0 {
         didSet {
-            if indexTracker != oldValue {
+            if indexChangeNotifier != oldValue {
                 switch transitionInfo {
                     case .inProgress(let targetIndex):
                         if targetIndex == index {
@@ -189,21 +189,11 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
         addCollectionView()
     }
     
+    private var indexBeforeRotation: Int = 0
+    
     open override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         
-        let index = self.index
-        collectionView.addSnapshot()
-        coordinator.animate(alongsideTransition: { (_) in
-            self.collectionView.flowLayout?.invalidateLayout()
-            self.setCollectionViewContentOffsetWithoutAnimation(for: index)
-            NotificationCenter.default.post(name: hideCellNotification, object: nil, userInfo: [showHideCellNotificationIndexParameterName: index])
-            UIView.performWithoutAnimation {
-                self.view.layoutIfNeeded()
-            }
-        }) { (_) in
-            self.collectionView.removeSnapshot()
-            NotificationCenter.default.post(name: showCellNotification, object: nil, userInfo: [showHideCellNotificationIndexParameterName: index])
-        }
+        indexBeforeRotation = index
         
         super.viewWillTransition(to: size, with: coordinator)
     }
@@ -252,8 +242,17 @@ open class CollectionPageViewController: UIViewController, UICollectionViewDataS
         return collectionView.bounds.size
     }
     
+    public func collectionView(_ collectionView: UICollectionView, targetContentOffsetForProposedContentOffset proposedContentOffset: CGPoint) -> CGPoint {
+        switch navigationOrientation {
+            case .horizontal:
+                return CGPoint(x: CGFloat(indexBeforeRotation) * collectionView.bounds.width, y: proposedContentOffset.y)
+            case .vertical:
+                return CGPoint(x: proposedContentOffset.x, y: CGFloat(indexBeforeRotation) * collectionView.bounds.height)
+        }
+    }
+    
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        indexTracker = index
+        indexChangeNotifier = index
     }
 }
 
